@@ -9,6 +9,7 @@ def makelist(pid):
     line.append(p.cpu_percent())
     line.append(p.memory_percent())
     line.append(p.name())
+    
     return line
 
 

@@ -63,6 +63,7 @@ def makelist(pid):
     line.append(pid)
     line.append(round(p.cpu_percent(),2))
     line.append(round(p.memory_percent(), 3))
+    line.append(p.status())
     line.append(p.name())
     return line
 
@@ -71,7 +72,7 @@ def psInfo():
     '''进程监控'''
     pids = psutil.pids()
     lines = map(makelist, pids)
-    headers = ['User', 'Pid', 'Cpu%', 'Mem%', 'Command']
+    headers = ['User', 'Pid', 'Cpu%', 'Mem%', 'Status', 'Command']
     tablelines = tabulate(list(lines), headers).split('\n')
     return tablelines[0], tablelines[2:]
 
@@ -84,14 +85,14 @@ def display_info(str, x, y, colorpair=2):
     return
 
 
-def refleshPsProcess():
-    for i in range(4, 23):
+def refleshProcess(start, end):
+    for i in range(start, end):
         display_info(" "*80, 0, i, 4)
 
 
 def psPageProcess(mode=None):
     global stdscr
-    refleshPsProcess()
+    refleshProcess(4, 23)
     stdscr.refresh()
     if mode == 'down':
         pagelist = partition.nextPage()
@@ -116,6 +117,7 @@ def process():
     jobstatic = jobStatistic()
     cpustatic = cpuinfo()
     # memstatic = memoryInfo()
+    refleshProcess(0, 23)
     display_info(jobstatic, 0, 0, 1)
     display_info(cpustatic, 0, 1, 1)
 
@@ -124,7 +126,7 @@ def process():
     display_info(pstitle, 0, 3, 2)
     psPageProcess()
 
-    display_info("q='quit' j='up' k='down'", 0, 23)
+    display_info("q='quit' j='up' k='down' f='refresh'", 0, 23)
     stdscr.refresh()
     return
 
@@ -189,6 +191,10 @@ class InputThread(threading.Thread):
             elif action is ord('k'):      # page up
                 threadLock.acquire()
                 psPageProcess('up')
+                threadLock.release()
+            elif action is ord('f'):
+                threadLock.acquire()
+                process()
                 threadLock.release()
 
     def stop(self):

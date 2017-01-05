@@ -15,6 +15,7 @@ Options:
 import curses
 from tabulate import tabulate
 from utils import systemcall
+from utils import Partition
 import threading
 import time
 import psutil
@@ -23,6 +24,8 @@ stdscr = curses.initscr()
 action = ''
 threadLock = threading.Lock()
 threads = []
+PAGE_SIZE = 20
+partition = Partition(PAGE_SIZE)
 
 def jobStatistic():
     '''获取作业信息'''
@@ -81,27 +84,47 @@ def display_info(str, x, y, colorpair=2):
     return
 
 
+def refleshPsProcess():
+    for i in range(4, 23):
+        display_info(" "*80, 0, i, 4)
+
+
+def psPageProcess(mode=None):
+    global stdscr
+    refleshPsProcess()
+    stdscr.refresh()
+    if mode == 'down':
+        pagelist = partition.nextPage()
+    elif mode == 'up':
+        pagelist = partition.frontPage()
+    else:
+        pagelist = partition.getCurPage()
+    i = 4
+    for line in pagelist:
+        if len(line) > 80:
+            display_info(line[:80], 0, i, 4)
+        else:
+            display_info(line, 0, i, 4)
+        i = i + 1
+    stdscr.refresh()
+    return
+
+
 def process():
+    '''''填充主要的显示逻辑'''
     global stdscr
     jobstatic = jobStatistic()
-    '''''填充主要的显示逻辑'''
     cpustatic = cpuinfo()
     # memstatic = memoryInfo()
-    pstitle, psstatic = psInfo()
     display_info(jobstatic, 0, 0, 1)
     display_info(cpustatic, 0, 1, 1)
+
+    pstitle, psstatic = psInfo()
+    partition.setData(psstatic)
     display_info(pstitle, 0, 3, 2)
-    i = 4
-    for line in psstatic:
-        if len(line) <= 80 and i <= 22:
-            display_info(line, 0, i, 4)
-            i = i + 1
-        elif len(line) > 80 and i <= 21:
-            display_info(line, 0, i, 4)
-            i = i + 2
-        else:
-            break
-    # display_info("Press any key to continue...", 0, 20)
+    psPageProcess()
+
+    display_info("q='quit' j='up' k='down'", 0, 23)
     stdscr.refresh()
     return
 
@@ -109,6 +132,8 @@ def process():
 def pre_exit_process():
     '''退出前的处理'''
     # process()
+    display_info(" "*(80-1), 0, 23)
+    stdscr.refresh()
     display_info("Now program is exiting...", 0, 23)
     stdscr.refresh()
     return
@@ -157,6 +182,14 @@ class InputThread(threading.Thread):
                 threadLock.release()
                 self.outputThread.stop()
                 self.stop()
+            elif action is ord('j'):      # page down
+                threadLock.acquire()
+                psPageProcess('down')
+                threadLock.release()
+            elif action is ord('k'):      # page up
+                threadLock.acquire()
+                psPageProcess('up')
+                threadLock.release()
 
     def stop(self):
         self.__running.clear()        # 设置为False

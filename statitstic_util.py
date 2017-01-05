@@ -12,9 +12,7 @@ Options:
   --debug      debug
 
 """
-import logging
 import curses
-# from docopt import docopt
 from tabulate import tabulate
 from utils import systemcall
 import threading
@@ -54,31 +52,32 @@ def cpuinfo():
     return cpu_result
 
 
+def makelist(pid):
+    '''构造进程的监控参数'''
+    line = []
+    p = psutil.Process(pid)
+    line.append(p.username())
+    line.append(pid)
+    line.append(round(p.cpu_percent(),2))
+    line.append(round(p.memory_percent(), 3))
+    line.append(p.name())
+    return line
+
+
 def psInfo():
     '''进程监控'''
     pids = psutil.pids()
-    lines = []
-
-    def makelist(pid):
-        '''构造进程的监控参数'''
-        line = []
-        p = psutil.Process(pid)
-        name = p.name()
-        line.append(pid)
-        line.append(name)
-        username = p.username()
-        line.append(username)
-        return line
-
     lines = map(makelist, pids)
-
-    return
+    headers = ['User', 'Pid', 'Cpu%', 'Mem%', 'Command']
+    tablelines = tabulate(list(lines), headers).split('\n')
+    return tablelines[0], tablelines[2:]
 
 
 def display_info(str, x, y, colorpair=2):
     '''''使用指定的colorpair显示文字'''
     global stdscr
     stdscr.addstr(y, x, str, curses.color_pair(colorpair))
+    stdscr.refresh()
     return
 
 
@@ -87,20 +86,22 @@ def process():
     jobstatic = jobStatistic()
     '''''填充主要的显示逻辑'''
     cpustatic = cpuinfo()
-    memstatic = memoryInfo()
-    psstatic = psInfo()
+    # memstatic = memoryInfo()
+    pstitle, psstatic = psInfo()
     display_info(jobstatic, 0, 0, 1)
     display_info(cpustatic, 0, 1, 1)
-    i = 2
+    display_info(pstitle, 0, 3, 2)
+    i = 4
     for line in psstatic:
-        if len(line) <= 80:
-            display_info(line, 0, i, 1)
+        if len(line) <= 80 and i <= 22:
+            display_info(line, 0, i, 4)
             i = i + 1
-        else:
-            display_info(line, 0, i, 1)
+        elif len(line) > 80 and i <= 21:
+            display_info(line, 0, i, 4)
             i = i + 2
-
-    display_info("Press any key to continue...", 0, 20)
+        else:
+            break
+    # display_info("Press any key to continue...", 0, 20)
     stdscr.refresh()
     return
 
@@ -171,6 +172,8 @@ def set_win():
     # 文字和背景色设置，设置了两个color pair，分别为1和2
     curses.init_pair(1, curses.COLOR_GREEN, curses.COLOR_BLACK)
     curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLACK)
+    curses.init_pair(3, curses.COLOR_BLUE, curses.COLOR_BLACK)
+    curses.init_pair(4, curses.COLOR_WHITE, curses.COLOR_BLACK)
     # 关闭屏幕回显
     curses.noecho()
     # 输入时不需要回车确认
